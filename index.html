@@ -1,0 +1,1760 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AETHERIS — 次世代雲端智算與空間運算引擎</title>
+  <meta name="description" content="AETHERIS 打造低延遲分散式 AI 推論與即時液態資料管線，為全球科技團隊提供可觀測、可擴展的次世代運算底座。" />
+  <style>
+    :root {
+      --bg-deep: #050714;
+      --bg-surface: rgba(11, 16, 36, 0.68);
+      --bg-surface-strong: rgba(13, 19, 44, 0.86);
+      --border-subtle: rgba(148, 163, 255, 0.16);
+      --border-bright: rgba(167, 139, 250, 0.42);
+      --text-primary: #f8fafc;
+      --text-secondary: #cbd5e1;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-indigo: #6366f1;
+      --accent-violet: #a855f7;
+      --accent-cyan: #22d3ee;
+      --radius-lg: 22px;
+      --radius-md: 14px;
+      --radius-pill: 999px;
+      --shadow-glow: 0 24px 64px -16px rgba(56, 189, 248, 0.2), 0 12px 32px -12px rgba(139, 92, 246, 0.25);
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      background-color: var(--bg-deep);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    body {
+      min-height: 100vh;
+      overflow-x: hidden;
+      background-color: var(--bg-deep);
+      color: var(--text-primary);
+      line-height: 1.65;
+      position: relative;
+    }
+
+    /* 靜態深色藍紫漸層基底（同時作為 WebGL 不支援或減少動態時的優雅降級） */
+    .static-gradient-bg {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse 72% 58% at 18% 22%, rgba(79, 70, 229, 0.42) 0%, transparent 65%),
+        radial-gradient(ellipse 68% 55% at 82% 28%, rgba(147, 51, 234, 0.34) 0%, transparent 62%),
+        radial-gradient(ellipse 65% 58% at 52% 84%, rgba(14, 165, 233, 0.28) 0%, transparent 64%),
+        linear-gradient(145deg, #040612 0%, #0b1030 48%, #160c36 100%);
+    }
+
+    /* WebGL 液態漸層畫布 */
+    #liquid-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      pointer-events: none;
+      display: block;
+      opacity: 1;
+      transition: opacity 0.45s ease;
+    }
+
+    body.webgl-fallback #liquid-canvas,
+    body.reduced-motion #liquid-canvas {
+      opacity: 0;
+      visibility: hidden;
+    }
+
+    /* 可讀性保護暗角遮罩，保留液態藍紫光澤同時確保文字高對比 */
+    .readability-scrim {
+      position: fixed;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 50% 18%, rgba(5, 7, 20, 0.06) 0%, rgba(5, 7, 20, 0.34) 100%);
+    }
+
+    .page-shell {
+      position: relative;
+      z-index: 3;
+      width: 100%;
+    }
+
+    .container {
+      width: min(1160px, calc(100% - 2.5rem));
+      margin-inline: auto;
+    }
+
+    /* 跳至主內容（無障礙） */
+    .skip-link {
+      position: fixed;
+      top: -64px;
+      left: 16px;
+      z-index: 100;
+      background: var(--accent-blue);
+      color: #030712;
+      font-weight: 700;
+      padding: 10px 16px;
+      border-radius: 10px;
+      text-decoration: none;
+      transition: top 0.2s ease;
+    }
+    .skip-link:focus {
+      top: 16px;
+    }
+
+    /* 導覽列 */
+    .site-header {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      background: rgba(5, 8, 22, 0.68);
+      border-bottom: 1px solid rgba(148, 163, 255, 0.12);
+    }
+
+    .nav-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      min-height: 70px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--text-primary);
+      text-decoration: none;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      font-size: 1.02rem;
+    }
+
+    .brand-mark {
+      width: 30px;
+      height: 30px;
+      border-radius: 9px;
+      background: linear-gradient(135deg, #38bdf8 0%, #6366f1 52%, #a855f7 100%);
+      box-shadow: 0 0 22px rgba(99, 102, 241, 0.55);
+      display: grid;
+      place-items: center;
+      font-size: 0.85rem;
+      color: #fff;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 0.92rem;
+      font-weight: 500;
+      transition: color 0.2s ease;
+    }
+
+    .nav-links a:hover,
+    .nav-links a:focus-visible {
+      color: var(--text-primary);
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* 動態控制膠囊 */
+    .motion-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: var(--radius-pill);
+      border: 1px solid var(--border-subtle);
+      background: rgba(15, 23, 52, 0.72);
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+    }
+
+    .motion-pill:hover {
+      border-color: var(--border-bright);
+      color: var(--text-primary);
+    }
+
+    .motion-pill[aria-pressed="true"] {
+      background: rgba(99, 102, 241, 0.28);
+      border-color: rgba(129, 140, 248, 0.75);
+      color: #ffffff;
+    }
+
+    /* 焦點環 */
+    a:focus-visible,
+    button:focus-visible,
+    input:focus-visible {
+      outline: 2px solid var(--accent-cyan);
+      outline-offset: 3px;
+    }
+
+    /* 按鈕與磁吸回彈系統 */
+    .btn {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 14px 26px;
+      border-radius: var(--radius-pill);
+      font-size: 0.96rem;
+      font-weight: 700;
+      text-decoration: none;
+      border: 1px solid transparent;
+      cursor: pointer;
+      user-select: none;
+      will-change: transform;
+      transition: box-shadow 0.28s ease, border-color 0.25s ease, background 0.25s ease;
+    }
+
+    .btn-inner {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      pointer-events: none;
+      will-change: transform;
+    }
+
+    .btn-primary {
+      color: #ffffff;
+      background: linear-gradient(135deg, #2563eb 0%, #6366f1 52%, #9333ea 100%);
+      box-shadow: 0 12px 34px -8px rgba(99, 102, 241, 0.68), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    }
+
+    .btn-primary:hover {
+      box-shadow: 0 18px 44px -8px rgba(56, 189, 248, 0.6), 0 0 0 1px rgba(167, 139, 250, 0.55);
+    }
+
+    .btn-ghost {
+      color: var(--text-primary);
+      background: rgba(15, 23, 52, 0.62);
+      border-color: rgba(148, 163, 255, 0.28);
+      backdrop-filter: blur(12px);
+    }
+
+    .btn-ghost:hover {
+      background: rgba(30, 41, 82, 0.78);
+      border-color: rgba(129, 140, 248, 0.68);
+    }
+
+    /* Hero 區塊 */
+    .hero {
+      padding: clamp(4.5rem, 11vh, 8.2rem) 0 clamp(3.5rem, 8vh, 5.5rem);
+      text-align: center;
+    }
+
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 16px;
+      border-radius: var(--radius-pill);
+      background: rgba(15, 23, 52, 0.72);
+      border: 1px solid rgba(129, 140, 248, 0.34);
+      color: #e0e7ff;
+      font-size: 0.84rem;
+      font-weight: 600;
+      margin-bottom: 24px;
+      backdrop-filter: blur(12px);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-cyan);
+      box-shadow: 0 0 12px var(--accent-cyan);
+    }
+
+    .hero h1 {
+      font-size: clamp(2.35rem, 5.6vw, 4.45rem);
+      line-height: 1.12;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      max-width: 18ch;
+      margin: 0 auto 22px;
+      color: #ffffff;
+      text-shadow: 0 8px 34px rgba(5, 7, 20, 0.55);
+    }
+
+    .gradient-text {
+      background: linear-gradient(120deg, #e0f2fe 0%, #7dd3fc 32%, #a78bfa 68%, #f0abfc 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .hero-sub {
+      font-size: clamp(1.02rem, 1.8vw, 1.22rem);
+      color: var(--text-secondary);
+      max-width: 60ch;
+      margin: 0 auto 36px;
+    }
+
+    .hero-cta-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      margin-bottom: 48px;
+    }
+
+    /* 即時狀態指標列 */
+    .telemetry-strip {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+      max-width: 920px;
+      margin: 0 auto;
+    }
+
+    .telemetry-item {
+      padding: 18px 16px;
+      border-radius: var(--radius-md);
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      backdrop-filter: blur(16px);
+      text-align: left;
+    }
+
+    .telemetry-val {
+      font-size: clamp(1.35rem, 2.5vw, 1.8rem);
+      font-weight: 800;
+      color: #ffffff;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.2;
+    }
+
+    .telemetry-label {
+      margin-top: 4px;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+    }
+
+    /* 區段共用排版 */
+    section.band {
+      padding: clamp(3.5rem, 8vh, 6rem) 0;
+    }
+
+    .section-head {
+      max-width: 680px;
+      margin-bottom: 42px;
+    }
+
+    .section-tag {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--accent-blue);
+      margin-bottom: 10px;
+    }
+
+    .section-head h2 {
+      font-size: clamp(1.75rem, 3.4vw, 2.65rem);
+      line-height: 1.2;
+      font-weight: 800;
+      margin-bottom: 14px;
+      color: #ffffff;
+    }
+
+    .section-head p {
+      color: var(--text-secondary);
+      font-size: 1.02rem;
+    }
+
+    /* 卡片網格 + Hover 微幅 3D 傾斜 */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 22px;
+    }
+
+    .tilt-card {
+      position: relative;
+      padding: 28px;
+      border-radius: var(--radius-lg);
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      overflow: hidden;
+      transform-style: preserve-3d;
+      will-change: transform;
+      transition: border-color 0.25s ease, box-shadow 0.3s ease;
+    }
+
+    .tilt-card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: var(--glare-opacity, 0);
+      background: radial-gradient(
+        420px circle at var(--glare-x, 50%) var(--glare-y, 50%),
+        rgba(125, 211, 252, 0.18),
+        rgba(168, 85, 247, 0.08) 42%,
+        transparent 72%
+      );
+      transition: opacity 0.25s ease;
+    }
+
+    .tilt-card:hover {
+      border-color: var(--border-bright);
+      box-shadow: var(--shadow-glow);
+    }
+
+    .card-icon {
+      width: 46px;
+      height: 46px;
+      border-radius: 13px;
+      display: grid;
+      place-items: center;
+      margin-bottom: 18px;
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(168, 85, 247, 0.24));
+      border: 1px solid rgba(167, 139, 250, 0.35);
+      font-size: 1.25rem;
+    }
+
+    .tilt-card h3 {
+      font-size: 1.18rem;
+      font-weight: 750;
+      margin-bottom: 10px;
+      color: #ffffff;
+    }
+
+    .tilt-card p {
+      font-size: 0.94rem;
+      color: var(--text-secondary);
+      margin-bottom: 18px;
+    }
+
+    .card-meta {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--accent-blue);
+    }
+
+    /* 互動架構體驗區 */
+    .architecture-panel {
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 24px;
+      align-items: stretch;
+    }
+
+    .panel-box {
+      padding: 30px;
+      border-radius: var(--radius-lg);
+      background: var(--bg-surface-strong);
+      border: 1px solid var(--border-subtle);
+      backdrop-filter: blur(20px);
+    }
+
+    .mode-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .mode-tab {
+      padding: 9px 16px;
+      border-radius: var(--radius-pill);
+      border: 1px solid var(--border-subtle);
+      background: rgba(15, 23, 52, 0.65);
+      color: var(--text-secondary);
+      font-size: 0.86rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .mode-tab[aria-selected="true"] {
+      background: linear-gradient(135deg, rgba(37, 99, 235, 0.45), rgba(147, 51, 234, 0.45));
+      border-color: rgba(125, 211, 252, 0.7);
+      color: #ffffff;
+    }
+
+    .code-preview {
+      margin-top: 16px;
+      padding: 18px;
+      border-radius: 14px;
+      background: rgba(3, 6, 18, 0.84);
+      border: 1px solid rgba(148, 163, 255, 0.16);
+      font-family: var(--font-mono);
+      font-size: 0.83rem;
+      color: #e2e8f0;
+      overflow-x: auto;
+      line-height: 1.65;
+    }
+
+    .code-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    .copy-btn {
+      padding: 5px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border-subtle);
+      background: rgba(30, 41, 82, 0.7);
+      color: var(--text-primary);
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .copy-btn:hover {
+      border-color: var(--accent-cyan);
+    }
+
+    .metrics-list {
+      display: grid;
+      gap: 14px;
+      margin-top: 18px;
+    }
+
+    .metric-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 16px;
+      border-radius: 12px;
+      background: rgba(15, 23, 52, 0.56);
+      border: 1px solid rgba(148, 163, 255, 0.12);
+    }
+
+    .metric-row strong {
+      font-size: 1.05rem;
+      color: var(--accent-cyan);
+      font-family: var(--font-mono);
+    }
+
+    /* 底部 CTA 區塊 */
+    .cta-banner {
+      padding: clamp(2.5rem, 6vw, 4rem);
+      border-radius: 28px;
+      background: linear-gradient(135deg, rgba(29, 78, 216, 0.34), rgba(109, 40, 217, 0.34));
+      border: 1px solid rgba(167, 139, 250, 0.34);
+      backdrop-filter: blur(20px);
+      text-align: center;
+      box-shadow: var(--shadow-glow);
+    }
+
+    .cta-banner h2 {
+      font-size: clamp(1.7rem, 3.2vw, 2.5rem);
+      margin-bottom: 12px;
+    }
+
+    .cta-banner p {
+      color: var(--text-secondary);
+      max-width: 54ch;
+      margin: 0 auto 28px;
+    }
+
+    .site-footer {
+      padding: 36px 0 56px;
+      border-top: 1px solid rgba(148, 163, 255, 0.12);
+      color: var(--text-muted);
+      font-size: 0.86rem;
+    }
+
+    .footer-inner {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .render-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-radius: var(--radius-pill);
+      background: rgba(15, 23, 52, 0.72);
+      border: 1px solid var(--border-subtle);
+      font-family: var(--font-mono);
+      font-size: 0.76rem;
+      color: var(--text-secondary);
+    }
+
+    /* 捲動淡入上移（保留原生捲動） */
+    .reveal {
+      opacity: 0;
+      transform: translateY(26px);
+      transition:
+        opacity 0.72s cubic-bezier(0.22, 1, 0.36, 1) var(--delay, 0ms),
+        transform 0.72s cubic-bezier(0.22, 1, 0.36, 1) var(--delay, 0ms);
+    }
+
+    .reveal.is-visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* 減少動態模式：全面停用位移與過渡 */
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .reveal {
+        opacity: 1 !important;
+        transform: none !important;
+        transition: none !important;
+      }
+      .btn, .btn-inner, .tilt-card {
+        transition: none !important;
+        transform: none !important;
+      }
+    }
+
+    body.reduced-motion .reveal {
+      opacity: 1 !important;
+      transform: none !important;
+      transition: none !important;
+    }
+
+    body.reduced-motion .btn,
+    body.reduced-motion .btn-inner,
+    body.reduced-motion .tilt-card {
+      transform: none !important;
+    }
+
+    /* 互動預約 Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 80;
+      background: rgba(3, 6, 18, 0.74);
+      backdrop-filter: blur(10px);
+      display: none;
+      place-items: center;
+      padding: 20px;
+    }
+
+    .modal-backdrop.open {
+      display: grid;
+    }
+
+    .modal-card {
+      width: min(460px, 100%);
+      padding: 28px;
+      border-radius: 22px;
+      background: #0c1229;
+      border: 1px solid var(--border-bright);
+      box-shadow: 0 28px 80px rgba(0, 0, 0, 0.65);
+    }
+
+    .modal-card h3 {
+      font-size: 1.25rem;
+      margin-bottom: 8px;
+    }
+
+    .modal-card p {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      margin-bottom: 18px;
+    }
+
+    .field-group {
+      display: grid;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .field-group input {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--border-subtle);
+      background: rgba(5, 8, 22, 0.9);
+      color: #ffffff;
+      font-size: 0.94rem;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    /* Toast 通知 */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      z-index: 90;
+      padding: 11px 20px;
+      border-radius: var(--radius-pill);
+      background: rgba(13, 20, 46, 0.94);
+      border: 1px solid rgba(56, 189, 248, 0.55);
+      color: #f8fafc;
+      font-size: 0.88rem;
+      font-weight: 600;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* 響應式設計 */
+    @media (max-width: 960px) {
+      .cards-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .architecture-panel {
+        grid-template-columns: 1fr;
+      }
+      .telemetry-strip {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 720px) {
+      .container {
+        width: min(1160px, calc(100% - 1.5rem));
+      }
+      .nav-links {
+        display: none;
+      }
+      .nav-inner {
+        min-height: 62px;
+      }
+      .motion-pill span.pill-text-desktop {
+        display: none;
+      }
+      .cards-grid {
+        grid-template-columns: 1fr;
+      }
+      .hero-cta-group {
+        flex-direction: column;
+      }
+      .hero-cta-group .btn {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a href="#main-content" class="skip-link">跳至主要內容</a>
+
+  <!-- 靜態藍紫漸層（WebGL 不支援／減少動態時自動啟用） -->
+  <div class="static-gradient-bg" aria-hidden="true"></div>
+  <!-- WebGL 液態漸層與游標擾動畫布 -->
+  <canvas id="liquid-canvas" aria-hidden="true"></canvas>
+  <!-- 可讀性保護層 -->
+  <div class="readability-scrim" aria-hidden="true"></div>
+
+  <div class="page-shell">
+    <header class="site-header">
+      <div class="container nav-inner">
+        <a href="#top" class="brand" aria-label="AETHERIS 首頁">
+          <span class="brand-mark" aria-hidden="true">◆</span>
+          <span>AETHERIS</span>
+        </a>
+
+        <nav aria-label="主導覽">
+          <ul class="nav-links">
+            <li><a href="#capabilities">核心引擎</a></li>
+            <li><a href="#architecture">即時架構</a></li>
+            <li><a href="#cta">開始部署</a></li>
+          </ul>
+        </nav>
+
+        <div class="nav-actions">
+          <button type="button" id="btn-pause-anim" class="motion-pill" aria-pressed="false" title="暫停或恢復背景液態動畫">
+            <span aria-hidden="true" id="pause-icon">⏸</span>
+            <span class="pill-text-desktop" id="pause-label">暫停動畫</span>
+          </button>
+          <button type="button" id="btn-reduce-motion" class="motion-pill" aria-pressed="false" title="切換減少動態模式">
+            <span aria-hidden="true">✦</span>
+            <span class="pill-text-desktop" id="reduce-label">減少動態</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main id="main-content">
+      <!-- Hero -->
+      <section class="hero" id="top">
+        <div class="container">
+          <div class="hero-eyebrow reveal" style="--delay: 0ms;">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span>AETHERIS v4.2 · 全球邊緣液態推論網格上線</span>
+          </div>
+
+          <h1 class="reveal" style="--delay: 70ms;">
+            為次世代智慧系統打造<br />
+            <span class="gradient-text">液態級低延遲算力</span>
+          </h1>
+
+          <p class="hero-sub reveal" style="--delay: 140ms;">
+            移動游標即可擾動背景流場。AETHERIS 將多雲 GPU 推論、零信任安全閘道與即時遙測融合為單一彈性平臺，讓每一次請求在毫秒間完成自適應路由。
+          </p>
+
+          <div class="hero-cta-group reveal" style="--delay: 210ms;">
+            <button type="button" class="btn btn-primary magnetic-btn" id="cta-open-demo">
+              <span class="btn-inner">
+                <span>立即啟動沙盒</span>
+                <span aria-hidden="true">→</span>
+              </span>
+            </button>
+            <a href="#architecture" class="btn btn-ghost magnetic-btn">
+              <span class="btn-inner">
+                <span>探索即時架構</span>
+              </span>
+            </a>
+          </div>
+
+          <div class="telemetry-strip reveal" style="--delay: 280ms;">
+            <div class="telemetry-item">
+              <div class="telemetry-val">11.4 ms</div>
+              <div class="telemetry-label">亞太區 P99 推論延遲</div>
+            </div>
+            <div class="telemetry-item">
+              <div class="telemetry-val">99.995%</div>
+              <div class="telemetry-label">跨區主動雙活可用率</div>
+            </div>
+            <div class="telemetry-item">
+              <div class="telemetry-val">-38%</div>
+              <div class="telemetry-label">動態排程 GPU 成本降幅</div>
+            </div>
+            <div class="telemetry-item">
+              <div class="telemetry-val">42 Regions</div>
+              <div class="telemetry-label">全球低延遲邊緣節點</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 核心能力卡片（Hover 微幅 3D 傾斜 + 捲動淡入上移） -->
+      <section class="band" id="capabilities">
+        <div class="container">
+          <div class="section-head reveal">
+            <span class="section-tag">Core Architecture</span>
+            <h2>如流體般自適應的雲原生底座</h2>
+            <p>滑鼠移過下方卡片可感受細緻的立體光澤與微幅傾斜；在行動裝置上則自動降載以維持滑順原生捲動。</p>
+          </div>
+
+          <div class="cards-grid">
+            <article class="tilt-card reveal" style="--delay: 0ms;">
+              <div class="card-icon" aria-hidden="true">⚡</div>
+              <h3>流體彈性算力排程</h3>
+              <p>依流量波峰在 400 毫秒內完成跨區 GPU 節點冷啟與權重遷移，消除突發負載造成的尾端延遲。</p>
+              <span class="card-meta">SCHEDULER · &lt; 400ms SCALE</span>
+            </article>
+
+            <article class="tilt-card reveal" style="--delay: 90ms;">
+              <div class="card-icon" aria-hidden="true">🛡️</div>
+              <h3>內嵌零信任安全護欄</h3>
+              <p>所有推論與代理工具呼叫皆經 mTLS 與即時政策引擎驗證，原生符合 ISO 27001 與 ISO 42001 稽核追蹤。</p>
+              <span class="card-meta">ZERO TRUST · AIMS READY</span>
+            </article>
+
+            <article class="tilt-card reveal" style="--delay: 180ms;">
+              <div class="card-icon" aria-hidden="true">🌐</div>
+              <h3>全息遙測與成本治理</h3>
+              <p>從 Token 吞吐量到單一租戶 GPU 單位成本，提供即時可觀測儀表板與自動降本策略建議。</p>
+              <span class="card-meta">FINOPS · REAL-TIME TRACE</span>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- 互動架構切換與 SDK 範例 -->
+      <section class="band" id="architecture">
+        <div class="container">
+          <div class="section-head reveal">
+            <span class="section-tag">Interactive Runtime</span>
+            <h2>三行程式碼接入全球液態路由</h2>
+            <p>切換不同工作負載場景，即時預覽對應的邊緣路由配置與實測指標。</p>
+          </div>
+
+          <div class="architecture-panel">
+            <div class="panel-box reveal" style="--delay: 0ms;">
+              <div class="mode-tabs" role="tablist" aria-label="工作負載模式">
+                <button type="button" class="mode-tab" role="tab" aria-selected="true" data-mode="inference">AI 推論路由</button>
+                <button type="button" class="mode-tab" role="tab" aria-selected="false" data-mode="stream">即時串流分析</button>
+                <button type="button" class="mode-tab" role="tab" aria-selected="false" data-mode="guard">零信任稽核閘道</button>
+              </div>
+
+              <div class="code-head">
+                <span id="code-filename">aetheris.inference.ts</span>
+                <button type="button" class="copy-btn" id="btn-copy-code">複製範例</button>
+              </div>
+              <pre class="code-preview"><code id="code-content"></code></pre>
+            </div>
+
+            <div class="panel-box reveal" style="--delay: 110ms;">
+              <h3 id="mode-title" style="font-size:1.25rem; margin-bottom:8px;"></h3>
+              <p id="mode-desc" style="color:var(--text-secondary); font-size:0.95rem;"></p>
+
+              <div class="metrics-list" id="mode-metrics"></div>
+
+              <div style="margin-top:24px;">
+                <button type="button" class="btn btn-primary magnetic-btn" id="btn-simulate-pulse" style="width:100%;">
+                  <span class="btn-inner">
+                    <span>✦ 觸發液態場脈衝測試</span>
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 底部 CTA -->
+      <section class="band" id="cta">
+        <div class="container">
+          <div class="cta-banner reveal">
+            <h2>準備好升級您的企業算力架構了嗎？</h2>
+            <p>立即申請 14 天專屬架構沙盒，免費體驗跨區低延遲推論與完整 FinOps 成本剖析。</p>
+            <div class="hero-cta-group" style="margin-bottom:0;">
+              <button type="button" class="btn btn-primary magnetic-btn" id="cta-open-demo-bottom">
+                <span class="btn-inner">
+                  <span>預約架構師演示</span>
+                  <span aria-hidden="true">↗</span>
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-inner">
+        <div>© 2026 AETHERIS Technologies. Crafted with native WebGL &amp; accessible motion.</div>
+        <div class="render-badge" id="render-status">渲染模式：偵測中...</div>
+      </div>
+    </footer>
+  </div>
+
+  <!-- 預約沙盒 Modal -->
+  <div class="modal-backdrop" id="demo-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-card">
+      <h3 id="modal-title">啟動 AETHERIS 專屬沙盒</h3>
+      <p>輸入您的公務信箱，我們將立即產生測試金鑰並開放亞太區邊緣節點權限。</p>
+      <form id="demo-form">
+        <div class="field-group">
+          <label for="input-email" class="skip-link">公務信箱</label>
+          <input id="input-email" type="email" required placeholder="name@company.com" autocomplete="email" />
+          <label for="input-team" class="skip-link">團隊規模或應用場景</label>
+          <input id="input-team" type="text" placeholder="應用場景（例如：AI 客服推論、智慧製造）" />
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" id="btn-close-modal" style="padding:10px 18px;">取消</button>
+          <button type="submit" class="btn btn-primary" style="padding:10px 20px;">立即開通</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (() => {
+      'use strict';
+
+      /* =========================================================================
+       * 1. 全域狀態與無障礙 / 裝置偵測
+       * ========================================================================= */
+      const reducedMotionMQ = window.matchMedia('(prefers-reduced-motion: reduce)');
+      const coarsePointerMQ = window.matchMedia('(pointer: coarse)');
+
+      const state = {
+        paused: false,
+        userReduced: reducedMotionMQ.matches,
+        isMobile: coarsePointerMQ.matches || window.innerWidth < 768,
+        webglActive: false,
+        pageHidden: document.hidden
+      };
+
+      const pauseBtn = document.getElementById('btn-pause-anim');
+      const pauseIcon = document.getElementById('pause-icon');
+      const pauseLabel = document.getElementById('pause-label');
+      const reduceBtn = document.getElementById('btn-reduce-motion');
+      const reduceLabel = document.getElementById('reduce-label');
+      const renderStatus = document.getElementById('render-status');
+      const toastEl = document.getElementById('toast');
+
+      let toastTimer = null;
+      function showToast(msg) {
+        if (!toastEl) return;
+        toastEl.textContent = msg;
+        toastEl.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2600);
+      }
+
+      function updateRenderBadge() {
+        if (!renderStatus) return;
+        if (state.userReduced) {
+          renderStatus.textContent = '渲染模式：減少動態（靜態深藍紫漸層）';
+        } else if (!state.webglActive) {
+          renderStatus.textContent = '渲染模式：CSS 靜態漸層降級（WebGL 未啟用）';
+        } else if (state.paused) {
+          renderStatus.textContent = '渲染模式：WebGL 已暫停（省電待命）';
+        } else {
+          renderStatus.textContent = state.isMobile
+            ? '渲染模式：WebGL 行動省電模式（低負荷）'
+            : '渲染模式：WebGL 液態流場即時運算';
+        }
+      }
+
+      function syncMotionClasses() {
+        document.body.classList.toggle('reduced-motion', state.userReduced);
+        if (pauseBtn) {
+          pauseBtn.setAttribute('aria-pressed', String(state.paused));
+          pauseIcon.textContent = state.paused ? '▶' : '⏸';
+          pauseLabel.textContent = state.paused ? '恢復動畫' : '暫停動畫';
+        }
+        if (reduceBtn) {
+          reduceBtn.setAttribute('aria-pressed', String(state.userReduced));
+          reduceLabel.textContent = state.userReduced ? '動態已減少' : '減少動態';
+        }
+        updateRenderBadge();
+      }
+
+      /* =========================================================================
+       * 2. WebGL 液態藍紫漸層與游標擾動拖尾引擎（含靜態漸層降級）
+       * ========================================================================= */
+      const canvas = document.getElementById('liquid-canvas');
+      const MAX_TRAIL = 20;
+      const trailPoints = Array.from({ length: MAX_TRAIL }, () => ({
+        x: 0.5, y: 0.5, vx: 0, vy: 0, strength: 0
+      }));
+      let trailCursor = 0;
+      let lastPointer = { x: 0.5, y: 0.5, active: false };
+      let mouseSmooth = { x: 0.5, y: 0.5 };
+      let mouseEnergy = 0;
+
+      function injectImpulse(nx, ny, vx, vy, boost) {
+        const p = trailPoints[trailCursor];
+        p.x = nx;
+        p.y = ny;
+        p.vx = Math.max(-1, Math.min(1, vx));
+        p.vy = Math.max(-1, Math.min(1, vy));
+        p.strength = Math.min(1.35, boost);
+        trailCursor = (trailCursor + 1) % MAX_TRAIL;
+        mouseEnergy = Math.min(1.4, mouseEnergy + boost * 0.55);
+      }
+
+      const vertexShaderSrc = `
+        attribute vec2 a_pos;
+        varying vec2 v_uv;
+        void main() {
+          v_uv = a_pos * 0.5 + 0.5;
+          gl_Position = vec4(a_pos, 0.0, 1.0);
+        }
+      `;
+
+      const fragmentShaderSrc = `
+        #ifdef GL_FRAGMENT_PRECISION_HIGH
+        precision highp float;
+        #else
+        precision mediump float;
+        #endif
+        varying vec2 v_uv;
+        uniform vec2 u_res;
+        uniform float u_time;
+        uniform float u_mobile;
+        uniform vec2 u_mouse;
+        uniform float u_mouseEnergy;
+        uniform vec4 u_trail[${MAX_TRAIL}];
+
+        float hash(vec2 p) {
+          vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+          p3 += dot(p3, p3.yzx + 33.33);
+          return fract((p3.x + p3.y) * p3.z);
+        }
+
+        float noise(vec2 p) {
+          vec2 i = floor(p);
+          vec2 f = fract(p);
+          vec2 u = f * f * (3.0 - 2.0 * f);
+          return mix(
+            mix(hash(i + vec2(0.0, 0.0)), hash(i + vec2(1.0, 0.0)), u.x),
+            mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x),
+            u.y
+          );
+        }
+
+        float fbm(vec2 p) {
+          float v = 0.0;
+          float a = 0.5;
+          mat2 rot = mat2(0.80, -0.60, 0.60, 0.80);
+          for (int i = 0; i < 4; i++) {
+            if (u_mobile > 0.5 && i >= 3) break;
+            v += a * noise(p);
+            p = rot * p * 2.02 + vec2(17.1, 31.7);
+            a *= 0.5;
+          }
+          return v;
+        }
+
+        void main() {
+          vec2 uv = v_uv;
+          float aspect = u_res.x / max(u_res.y, 1.0);
+          vec2 p = (uv - 0.5) * vec2(aspect, 1.0);
+
+          // 游標與拖尾對液態流場的柔和擾動
+          vec2 distort = vec2(0.0);
+          float wakeGlow = 0.0;
+
+          for (int i = 0; i < ${MAX_TRAIL}; i++) {
+            vec4 tp = u_trail[i];
+            float str = tp.w;
+            if (str > 0.008) {
+              vec2 d = (uv - tp.xy) * vec2(aspect, 1.0);
+              float dist2 = dot(d, d);
+              float influence = exp(-dist2 * 18.0) * str;
+              // 順著移動方向推開流體並帶出微幅渦旋
+              vec2 swirl = vec2(-d.y, d.x) * 0.32;
+              distort += (d * 0.28 + swirl) * influence;
+              wakeGlow += exp(-dist2 * 26.0) * str;
+            }
+          }
+
+          // 即時游標中心光暈
+          vec2 md = (uv - u_mouse) * vec2(aspect, 1.0);
+          float mGlow = exp(-dot(md, md) * 14.0) * u_mouseEnergy;
+
+          float t = u_time * 0.16;
+          vec2 flowPos = p * 1.35 - distort * 1.6;
+
+          float q1 = fbm(flowPos + vec2(t, -t * 0.7));
+          float q2 = fbm(flowPos + vec2(q1 * 1.45 - t * 0.5, q1 * 1.2 + t * 0.6));
+          float liquid = fbm(flowPos * 1.15 + vec2(q2 * 1.65, -q1 * 1.1) + vec2(t * 0.4, 0.0));
+
+          // 深色藍紫液態調色盤（飽和度與層次明亮可辨，兼具深邃科技感）
+          vec3 colObsidian = vec3(0.035, 0.055, 0.165);
+          vec3 colNavy     = vec3(0.105, 0.195, 0.520);
+          vec3 colIndigo   = vec3(0.310, 0.255, 0.780);
+          vec3 colViolet   = vec3(0.560, 0.220, 0.840);
+          vec3 colCyan     = vec3(0.220, 0.740, 0.980);
+          vec3 colMagenta  = vec3(0.760, 0.400, 0.980);
+
+          vec3 col = mix(colObsidian, colNavy, smoothstep(0.14, 0.62, liquid));
+          col = mix(col, colIndigo, smoothstep(0.28, 0.74, q2) * 0.92);
+          col = mix(col, colViolet, smoothstep(0.42, 0.86, q1 * 0.62 + liquid * 0.48) * 0.88);
+
+          // 液態脊線高光
+          float ridge = pow(clamp(1.0 - abs(liquid - 0.50) * 2.8, 0.0, 1.0), 1.8);
+          col += mix(colCyan, colMagenta, q1) * ridge * 0.34;
+
+          // 游標拖尾柔光（隨游標停止平滑消散）
+          vec3 trailTint = mix(colCyan, colMagenta, clamp(q2, 0.0, 1.0));
+          col += trailTint * clamp(wakeGlow * 0.42 + mGlow * 0.28, 0.0, 0.68);
+
+          // 極細微抖動去色帶（Anti-banding，使用 0..1 座標避免 16-bit 溢位）
+          float grain = (hash(uv * 256.0 + fract(u_time)) - 0.5) * 0.014;
+          col += grain;
+
+          gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+        }
+      `;
+
+      let gl = null;
+      let program = null;
+      let uniforms = {};
+      let rafId = null;
+      let elapsedTime = 0;
+      let lastFrameTs = 0;
+      const trailUniformData = new Float32Array(MAX_TRAIL * 4);
+
+      function compileShader(context, type, source) {
+        const shader = context.createShader(type);
+        context.shaderSource(shader, source);
+        context.compileShader(shader);
+        if (!context.getShaderParameter(shader, context.COMPILE_STATUS)) {
+          context.deleteShader(shader);
+          return null;
+        }
+        return shader;
+      }
+
+      function enableWebGLFallback() {
+        state.webglActive = false;
+        document.body.classList.add('webgl-fallback');
+        updateRenderBadge();
+      }
+
+      function initWebGL() {
+        if (!canvas || window.__FORCE_NO_WEBGL) {
+          enableWebGLFallback();
+          return false;
+        }
+
+        try {
+          gl = canvas.getContext('webgl', {
+            alpha: false,
+            antialias: false,
+            depth: false,
+            stencil: false,
+            preserveDrawingBuffer: true,
+            powerPreference: state.isMobile ? 'low-power' : 'high-performance'
+          }) || canvas.getContext('experimental-webgl', { preserveDrawingBuffer: true });
+        } catch (e) {
+          gl = null;
+        }
+
+        if (!gl) {
+          enableWebGLFallback();
+          return false;
+        }
+
+        const vs = compileShader(gl, gl.VERTEX_SHADER, vertexShaderSrc);
+        const fs = compileShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSrc);
+        if (!vs || !fs) {
+          enableWebGLFallback();
+          return false;
+        }
+
+        program = gl.createProgram();
+        gl.attachShader(program, vs);
+        gl.attachShader(program, fs);
+        gl.linkProgram(program);
+
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+          enableWebGLFallback();
+          return false;
+        }
+
+        gl.useProgram(program);
+        const buffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+        gl.bufferData(
+          gl.ARRAY_BUFFER,
+          new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]),
+          gl.STATIC_DRAW
+        );
+
+        const posLoc = gl.getAttribLocation(program, 'a_pos');
+        gl.enableVertexAttribArray(posLoc);
+        gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+
+        uniforms = {
+          res: gl.getUniformLocation(program, 'u_res'),
+          time: gl.getUniformLocation(program, 'u_time'),
+          mobile: gl.getUniformLocation(program, 'u_mobile'),
+          mouse: gl.getUniformLocation(program, 'u_mouse'),
+          mouseEnergy: gl.getUniformLocation(program, 'u_mouseEnergy'),
+          trail: gl.getUniformLocation(program, 'u_trail')
+        };
+
+        canvas.addEventListener('webglcontextlost', (e) => {
+          e.preventDefault();
+          enableWebGLFallback();
+        }, false);
+
+        state.webglActive = true;
+        document.body.classList.remove('webgl-fallback');
+        resizeCanvas();
+        drawSingleFrame();
+        updateRenderBadge();
+        return true;
+      }
+
+      function drawSingleFrame() {
+        if (!gl || !state.webglActive) return;
+        gl.uniform2f(uniforms.res, canvas.width, canvas.height);
+        gl.uniform1f(uniforms.time, elapsedTime);
+        gl.uniform1f(uniforms.mobile, state.isMobile ? 1.0 : 0.0);
+        gl.uniform2f(uniforms.mouse, mouseSmooth.x, mouseSmooth.y);
+        gl.uniform1f(uniforms.mouseEnergy, mouseEnergy);
+        gl.uniform4fv(uniforms.trail, trailUniformData);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+      }
+
+      function resizeCanvas() {
+        state.isMobile = coarsePointerMQ.matches || window.innerWidth < 768;
+        if (!gl || !canvas) return;
+        const maxDpr = state.isMobile ? 1.0 : 1.0;
+        const dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
+        const scale = state.isMobile ? 0.45 : 0.60;
+        const w = Math.max(1, Math.floor(window.innerWidth * dpr * scale));
+        const h = Math.max(1, Math.floor(window.innerHeight * dpr * scale));
+        if (canvas.width !== w || canvas.height !== h) {
+          canvas.width = w;
+          canvas.height = h;
+          gl.viewport(0, 0, w, h);
+          lastFrameTs = 0;
+          drawSingleFrame();
+        }
+        updateRenderBadge();
+      }
+
+      function renderWebGLFrame(now) {
+        rafId = requestAnimationFrame(renderWebGLFrame);
+
+        if (!state.webglActive || state.paused || state.userReduced || state.pageHidden) {
+          lastFrameTs = now;
+          return;
+        }
+
+        // 自動同步視窗尺寸（避免動態縮放或裝置旋轉後畫布不同步）
+        const expectedMobile = coarsePointerMQ.matches || window.innerWidth < 768;
+        const expectedW = Math.max(1, Math.floor(window.innerWidth * (expectedMobile ? 0.45 : 0.60)));
+        if (expectedMobile !== state.isMobile || canvas.clientWidth === 0 || Math.abs(canvas.width - expectedW) > 4) {
+          resizeCanvas();
+        }
+
+        // 手機降頻至 ~22fps、桌機節流 ~33fps，保持絲滑且極致省電
+        const minDelta = state.isMobile ? 45 : 30;
+        if (lastFrameTs && (now - lastFrameTs) < minDelta) return;
+
+        const dt = lastFrameTs ? Math.min(0.05, (now - lastFrameTs) / 1000) : 0.016;
+        lastFrameTs = now;
+        elapsedTime += dt;
+
+        // 游標停止後：能量與所有拖尾節點指數平緩消散
+        const decay = Math.pow(0.915, dt * 60);
+        mouseEnergy *= Math.pow(0.90, dt * 60);
+        if (mouseEnergy < 0.002) mouseEnergy = 0;
+
+        mouseSmooth.x += (lastPointer.x - mouseSmooth.x) * Math.min(1, dt * 10);
+        mouseSmooth.y += (lastPointer.y - mouseSmooth.y) * Math.min(1, dt * 10);
+
+        for (let i = 0; i < MAX_TRAIL; i++) {
+          const p = trailPoints[i];
+          if (p.strength > 0.003) {
+            p.x += p.vx * dt * 0.08;
+            p.y += p.vy * dt * 0.08;
+            p.strength *= decay;
+          } else {
+            p.strength = 0;
+          }
+          const base = i * 4;
+          trailUniformData[base] = p.x;
+          trailUniformData[base + 1] = p.y;
+          trailUniformData[base + 2] = p.vx;
+          trailUniformData[base + 3] = p.strength;
+        }
+
+        drawSingleFrame();
+      }
+
+      // 游標 / 觸控擾動監聽
+      let lastEmitTime = 0;
+      function handlePointerMove(clientX, clientY, isTouch) {
+        if (state.paused || state.userReduced || !state.webglActive) return;
+        const nx = clientX / Math.max(window.innerWidth, 1);
+        const ny = 1.0 - clientY / Math.max(window.innerHeight, 1);
+
+        const vx = lastPointer.active ? (nx - lastPointer.x) * 18 : 0;
+        const vy = lastPointer.active ? (ny - lastPointer.y) * 18 : 0;
+        const speed = Math.hypot(vx, vy);
+
+        lastPointer.x = nx;
+        lastPointer.y = ny;
+        lastPointer.active = true;
+
+        const now = performance.now();
+        const emitGap = isTouch ? 45 : 22;
+        if (now - lastEmitTime >= emitGap && speed > 0.015) {
+          lastEmitTime = now;
+          const boost = Math.min(isTouch ? 0.65 : 1.05, 0.28 + speed * 0.35);
+          injectImpulse(nx, ny, vx, vy, boost);
+        }
+      }
+
+      window.addEventListener('pointermove', (e) => {
+        if (e.pointerType === 'touch') return;
+        handlePointerMove(e.clientX, e.clientY, false);
+      }, { passive: true });
+
+      window.addEventListener('touchmove', (e) => {
+        if (!e.touches || !e.touches[0]) return;
+        handlePointerMove(e.touches[0].clientX, e.touches[0].clientY, true);
+      }, { passive: true });
+
+      /* =========================================================================
+       * 3. CTA 磁吸回彈（彈簧阻尼物理）
+       * ========================================================================= */
+      function initMagneticButtons() {
+        const buttons = document.querySelectorAll('.magnetic-btn');
+        buttons.forEach((btn) => {
+          const inner = btn.querySelector('.btn-inner');
+          let targetX = 0, targetY = 0;
+          let curX = 0, curY = 0;
+          let velX = 0, velY = 0;
+          let animating = false;
+
+          const stiffness = 0.16;
+          const damping = 0.72;
+
+          function tick() {
+            if (state.paused || state.userReduced || state.isMobile) {
+              btn.style.transform = '';
+              if (inner) inner.style.transform = '';
+              animating = false;
+              return;
+            }
+            velX = (velX + (targetX - curX) * stiffness) * damping;
+            velY = (velY + (targetY - curY) * stiffness) * damping;
+            curX += velX;
+            curY += velY;
+
+            btn.style.transform = `translate3d(${curX.toFixed(2)}px, ${curY.toFixed(2)}px, 0)`;
+            if (inner) {
+              inner.style.transform = `translate3d(${(curX * 0.32).toFixed(2)}px, ${(curY * 0.32).toFixed(2)}px, 0)`;
+            }
+
+            if (Math.abs(targetX - curX) > 0.05 || Math.abs(targetY - curY) > 0.05 || Math.abs(velX) > 0.05 || Math.abs(velY) > 0.05) {
+              requestAnimationFrame(tick);
+            } else {
+              curX = targetX;
+              curY = targetY;
+              btn.style.transform = targetX === 0 && targetY === 0 ? '' : `translate3d(${curX}px, ${curY}px, 0)`;
+              if (inner) inner.style.transform = targetX === 0 && targetY === 0 ? '' : `translate3d(${curX * 0.32}px, ${curY * 0.32}px, 0)`;
+              animating = false;
+            }
+          }
+
+          btn.addEventListener('pointermove', (e) => {
+            if (e.pointerType === 'touch' || state.paused || state.userReduced || state.isMobile) return;
+            const rect = btn.getBoundingClientRect();
+            const relX = (e.clientX - rect.left) / rect.width - 0.5;
+            const relY = (e.clientY - rect.top) / rect.height - 0.5;
+            targetX = relX * 22;
+            targetY = relY * 14;
+            if (!animating) {
+              animating = true;
+              requestAnimationFrame(tick);
+            }
+          });
+
+          btn.addEventListener('pointerleave', () => {
+            targetX = 0;
+            targetY = 0;
+            if (!animating) {
+              animating = true;
+              requestAnimationFrame(tick);
+            }
+          });
+        });
+      }
+
+      /* =========================================================================
+       * 4. 卡片 Hover 微幅 3D 傾斜與高光跟隨
+       * ========================================================================= */
+      function initTiltCards() {
+        const cards = document.querySelectorAll('.tilt-card');
+        cards.forEach((card) => {
+          let rafPending = false;
+          let rx = 0, ry = 0, gx = 50, gy = 50;
+
+          function applyTilt() {
+            rafPending = false;
+            if (state.paused || state.userReduced || state.isMobile) {
+              card.style.transform = '';
+              card.style.setProperty('--glare-opacity', '0');
+              return;
+            }
+            card.style.transform = `perspective(900px) rotateX(${rx.toFixed(2)}deg) rotateY(${ry.toFixed(2)}deg) translateY(-3px)`;
+            card.style.setProperty('--glare-x', `${gx.toFixed(1)}%`);
+            card.style.setProperty('--glare-y', `${gy.toFixed(1)}%`);
+            card.style.setProperty('--glare-opacity', '1');
+          }
+
+          card.addEventListener('pointermove', (e) => {
+            if (e.pointerType === 'touch' || state.paused || state.userReduced || state.isMobile) return;
+            const rect = card.getBoundingClientRect();
+            const px = (e.clientX - rect.left) / rect.width;
+            const py = (e.clientY - rect.top) / rect.height;
+            rx = (0.5 - py) * 9.5;
+            ry = (px - 0.5) * 9.5;
+            gx = px * 100;
+            gy = py * 100;
+            if (!rafPending) {
+              rafPending = true;
+              requestAnimationFrame(applyTilt);
+            }
+          });
+
+          card.addEventListener('pointerleave', () => {
+            card.style.transition = 'transform 0.45s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.25s ease, box-shadow 0.3s ease';
+            card.style.transform = '';
+            card.style.setProperty('--glare-opacity', '0');
+            setTimeout(() => {
+              card.style.transition = 'border-color 0.25s ease, box-shadow 0.3s ease';
+            }, 460);
+          });
+        });
+      }
+
+      /* =========================================================================
+       * 5. 捲動淡入上移（保留原生捲動）
+       * ========================================================================= */
+      function initScrollReveal() {
+        const items = Array.from(document.querySelectorAll('.reveal'));
+        function revealVisibleInViewport() {
+          const vh = window.innerHeight || document.documentElement.clientHeight;
+          items.forEach((el) => {
+            if (el.classList.contains('is-visible')) return;
+            const rect = el.getBoundingClientRect();
+            if (rect.top < vh * 0.96 && rect.bottom > 0) {
+              el.classList.add('is-visible');
+            }
+          });
+        }
+
+        if (!('IntersectionObserver' in window) || state.userReduced) {
+          items.forEach((el) => el.classList.add('is-visible'));
+          return;
+        }
+
+        // 首屏元素於下一幀立即觸發淡入上移，絕不留白
+        requestAnimationFrame(revealVisibleInViewport);
+        setTimeout(revealVisibleInViewport, 250);
+
+        const observer = new IntersectionObserver((entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('is-visible');
+              observer.unobserve(entry.target);
+            }
+          });
+        }, { threshold: 0.08, rootMargin: '0px 0px -24px 0px' });
+
+        items.forEach((el) => observer.observe(el));
+        window.addEventListener('scroll', revealVisibleInViewport, { passive: true });
+        window.addEventListener('resize', revealVisibleInViewport, { passive: true });
+      }
+
+      /* =========================================================================
+       * 6. 互動架構模式切換、複製範例、脈衝測試與預約 Modal
+       * ========================================================================= */
+      const MODE_DATA = {
+        inference: {
+          file: 'aetheris.inference.ts',
+          title: '全球 AI 推論液態路由',
+          desc: '自動偵測亞太與北美 GPU 佇列深度，將高優先級推論請求無縫切換至最低延遲節點。',
+          code: `import { Aetheris } from "@aetheris/sdk";
+
+const client = new Aetheris({ region: "auto-edge" });
+const res = await client.infer({
+  model: "aether-v4-turbo",
+  routing: "lowest-p99-latency",
+  prompt: "分析跨廠區即時良率異常趨勢"
+});`,
+          metrics: [
+            ['平均首字延遲 (TTFT)', '42 ms'],
+            ['跨區自動容錯切換', '< 180 ms'],
+            ['GPU 閒置資源節省', '-38%']
+          ]
+        },
+        stream: {
+          file: 'aetheris.stream.ts',
+          title: '高併發即時串流管線',
+          desc: '整合邊緣事件匯流排與向量快取，支撐每秒百萬級感測器與使用者互動事件。',
+          code: `import { createLiquidPipe } from "@aetheris/stream";
+
+export const pipe = createLiquidPipe({
+  source: "kafka://edge-telemetry",
+  windowMs: 250,
+  anomalyDetector: "enabled",
+  sink: "aetheris://realtime-lakehouse"
+});`,
+          metrics: [
+            ['單叢集吞吐量', '1.8M events/s'],
+            ['端到端事件延遲', '11.4 ms'],
+            ['資料遺失率', '0.000%']
+          ]
+        },
+        guard: {
+          file: 'aetheris.guard.ts',
+          title: '零信任 AI 安全與合規閘道',
+          desc: '在請求觸及模型前執行敏感個資遮罩、越權攔截與不可竄改稽核日誌寫入。',
+          code: `import { ZeroTrustGate } from "@aetheris/guard";
+
+export const gate = new ZeroTrustGate({
+  standards: ["ISO-27001", "ISO-42001"],
+  piiRedaction: "strict",
+  auditTrail: "immutable-ledger"
+});`,
+          metrics: [
+            ['敏感資料攔截精準度', '99.94%'],
+            ['安全閘道額外延遲', '+1.9 ms'],
+            ['合規報告自動產出', '即時同步']
+          ]
+        }
+      };
+
+      const codeFilename = document.getElementById('code-filename');
+      const codeContent = document.getElementById('code-content');
+      const modeTitle = document.getElementById('mode-title');
+      const modeDesc = document.getElementById('mode-desc');
+      const modeMetrics = document.getElementById('mode-metrics');
+      let currentMode = 'inference';
+
+      function renderMode(modeKey) {
+        currentMode = MODE_DATA[modeKey] ? modeKey : 'inference';
+        const data = MODE_DATA[currentMode];
+        document.querySelectorAll('.mode-tab').forEach((tab) => {
+          tab.setAttribute('aria-selected', String(tab.dataset.mode === currentMode));
+        });
+        codeFilename.textContent = data.file;
+        codeContent.textContent = data.code;
+        modeTitle.textContent = data.title;
+        modeDesc.textContent = data.desc;
+        modeMetrics.innerHTML = data.metrics.map(([k, v]) => `
+          <div class="metric-row">
+            <span>${k}</span>
+            <strong>${v}</strong>
+          </div>
+        `).join('');
+      }
+
+      document.querySelectorAll('.mode-tab').forEach((tab) => {
+        tab.addEventListener('click', () => {
+          renderMode(tab.dataset.mode);
+          if (state.webglActive && !state.paused && !state.userReduced) {
+            injectImpulse(0.5 + (Math.random() - 0.5) * 0.25, 0.45, 0.4, 0.2, 0.95);
+          }
+        });
+      });
+
+      document.getElementById('btn-copy-code').addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(MODE_DATA[currentMode].code);
+          showToast('已複製範例程式碼至剪貼簿');
+        } catch (e) {
+          showToast('已選取範例，請使用系統複製快捷鍵');
+        }
+      });
+
+      document.getElementById('btn-simulate-pulse').addEventListener('click', () => {
+        if (state.userReduced || state.paused || !state.webglActive) {
+          showToast('目前為靜態或暫停模式，可先於右上角恢復動畫體驗流場脈衝');
+          return;
+        }
+        const centers = [[0.3, 0.55], [0.5, 0.45], [0.72, 0.52]];
+        centers.forEach(([x, y], idx) => {
+          setTimeout(() => injectImpulse(x, y, (idx - 1) * 0.6, 0.45, 1.25), idx * 90);
+        });
+        showToast('✦ 已發射液態流場能量脈衝');
+      });
+
+      // Modal 控制
+      const modal = document.getElementById('demo-modal');
+      const emailInput = document.getElementById('input-email');
+      function openModal() {
+        modal.classList.add('open');
+        setTimeout(() => emailInput && emailInput.focus(), 40);
+      }
+      function closeModal() {
+        modal.classList.remove('open');
+      }
+
+      document.getElementById('cta-open-demo').addEventListener('click', openModal);
+      document.getElementById('cta-open-demo-bottom').addEventListener('click', openModal);
+      document.getElementById('btn-close-modal').addEventListener('click', closeModal);
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeModal();
+      });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && modal.classList.contains('open')) closeModal();
+      });
+
+      document.getElementById('demo-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const email = emailInput.value.trim();
+        closeModal();
+        e.target.reset();
+        showToast(`✓ 已為 ${email} 建立專屬沙盒存取連結`);
+      });
+
+      // 動畫暫停與減少動態切換
+      pauseBtn.addEventListener('click', () => {
+        state.paused = !state.paused;
+        syncMotionClasses();
+        showToast(state.paused ? '⏸ 背景動畫已暫停' : '▶ 背景動畫已恢復');
+      });
+
+      reduceBtn.addEventListener('click', () => {
+        state.userReduced = !state.userReduced;
+        syncMotionClasses();
+        if (state.userReduced) {
+          document.querySelectorAll('.reveal').forEach((el) => el.classList.add('is-visible'));
+        }
+        showToast(state.userReduced ? '已切換為減少動態模式（靜態漸層）' : '已恢復標準流體互動模式');
+      });
+
+      reducedMotionMQ.addEventListener('change', (e) => {
+        state.userReduced = e.matches;
+        syncMotionClasses();
+      });
+
+      document.addEventListener('visibilitychange', () => {
+        state.pageHidden = document.hidden;
+      });
+
+      window.addEventListener('resize', resizeCanvas, { passive: true });
+
+      // 啟動全部子系統
+      renderMode('inference');
+      initScrollReveal();
+      initMagneticButtons();
+      initTiltCards();
+      const webglReady = initWebGL();
+      syncMotionClasses();
+      if (webglReady) {
+        rafId = requestAnimationFrame(renderWebGLFrame);
+      }
+    })();
+  </script>
+</body>
+</html>
